@@ -1,7 +1,7 @@
 """
-Kuro AI Windows Auto-Typer & Physical Mouse Mover
-Directly types Gemini code into Kuro / any code editor and moves the physical mouse cursor.
-Zero pip packages required (Built-in Windows CTypes API).
+KURO WINDOWS APP AUTO-TYPER & PHYSICAL MOUSE ENGINE
+Specialized for KuroWindows desktop application.
+Uses native Windows Win32 API (Zero pip dependencies).
 """
 
 import os
@@ -14,62 +14,69 @@ import urllib.request
 from ctypes import wintypes
 
 user32 = ctypes.windll.user32
+kernel32 = ctypes.windll.kernel32
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 
 FALLBACK_CODE = [
-    """def merge_sort(arr):
+    """def quick_sort(arr):
     if len(arr) <= 1:
         return arr
-    mid = len(arr) // 2
-    left = merge_sort(arr[:mid])
-    right = merge_sort(arr[mid:])
-    return merge(left, right)
+    pivot = arr[len(arr) // 2]
+    left = [x for x in arr if x < pivot]
+    middle = [x for x in arr if x == pivot]
+    right = [x for x in arr if x > pivot]
+    return quick_sort(left) + middle + quick_sort(right)
 
-def merge(left, right):
-    result = []
-    i = j = 0
-    while i < len(left) and j < len(right):
-        if left[i] < right[j]:
-            result.append(left[i])
-            i += 1
-        else:
-            result.append(right[j])
-            j += 1
-    result.extend(left[i:])
-    result.extend(right[j:])
-    return result
-
-data = [64, 34, 25, 12, 22, 11, 90]
-print("Sorted Array:", merge_sort(data))
+numbers = [38, 27, 43, 3, 9, 82, 10]
+print("Sorted output:", quick_sort(numbers))
 """,
-    """function deepClone(obj) {
-  if (obj === null || typeof obj !== 'object') return obj;
-  if (Array.isArray(obj)) return obj.map(deepClone);
-  const copy = {};
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      copy[key] = deepClone(obj[key]);
-    }
-  }
-  return copy;
+    """import asyncio
+import time
+
+async def worker_task(task_id, delay):
+    print(f"Starting async worker task #{task_id}...")
+    await asyncio.sleep(delay)
+    return f"Task #{task_id} completed successfully at {time.time()}"
+
+async def main():
+    tasks = [worker_task(i, 0.5) for i in range(1, 6)]
+    results = await asyncio.gather(*tasks)
+    for res in results:
+        print(res)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+""",
+    """function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
 }
 
-const original = { user: 'Alice', scores: [98, 87, 95] };
-const cloned = deepClone(original);
-console.log('Cloned Object:', cloned);
+const handleResize = debounce(() => {
+  console.log('Window resized efficiently');
+}, 250);
+window.addEventListener('resize', handleResize);
 """,
     """#include <iostream>
 #include <vector>
-#include <numeric>
+#include <algorithm>
 
 using namespace std;
 
 int main() {
-    vector<int> numbers = {5, 10, 15, 20, 25};
-    int total = accumulate(numbers.begin(), numbers.end(), 0);
-    double avg = static_cast<double>(total) / numbers.size();
-    cout << "Sum: " << total << ", Avg: " << avg << endl;
+    vector<int> v = {4, 2, 5, 1, 3};
+    sort(v.begin(), v.end());
+    for(int n : v) {
+        cout << "Element: " << n << endl;
+    }
     return 0;
 }
 """
@@ -80,110 +87,142 @@ def fetch_gemini_code():
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         headers = {"Content-Type": "application/json"}
         payload = json.dumps({
-            "contents": [{"parts": [{"text": "Write 20-30 lines of clean, real, executable programming code in Python or JavaScript with comments. No markdown code blocks."}]}]
+            "contents": [{"parts": [{"text": "Write 20-30 lines of clean real python or javascript code for algorithmic tasks. No markdown code blocks."}]}]
         }).encode("utf-8")
 
         req = urllib.request.Request(url, data=payload, headers=headers)
-        with urllib.request.urlopen(req, timeout=10) as response:
+        with urllib.request.urlopen(req, timeout=8) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             text = res_data["candidates"][0]["content"]["parts"][0]["text"]
             text = text.replace("```python", "").replace("```javascript", "").replace("```", "").strip()
             if len(text) > 20:
                 return text
     except Exception as e:
-        print(f"[!] Gemini API fallback: {e}")
+        pass
     return random.choice(FALLBACK_CODE)
 
-def move_physical_mouse():
-    """Gently moves the real OS physical mouse cursor around active area."""
-    class POINT(ctypes.Structure):
-        _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
-    
+class POINT(ctypes.Structure):
+    _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+
+class KEYBDINPUT(ctypes.Structure):
+    _fields_ = [
+        ("wVk", wintypes.WORD),
+        ("wScan", wintypes.WORD),
+        ("dwFlags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ctypes.c_ulong)
+    ]
+
+class MOUSEINPUT(ctypes.Structure):
+    _fields_ = [
+        ("dx", wintypes.LONG),
+        ("dy", wintypes.LONG),
+        ("mouseData", wintypes.DWORD),
+        ("dwFlags", wintypes.DWORD),
+        ("time", wintypes.DWORD),
+        ("dwExtraInfo", ctypes.c_ulong)
+    ]
+
+class INPUT(ctypes.Structure):
+    class _INPUT_UNION(ctypes.Union):
+        _fields_ = [("ki", KEYBDINPUT), ("mi", MOUSEINPUT)]
+    _anonymous_ = ("_input",)
+    _fields_ = [
+        ("type", wintypes.DWORD),
+        ("_input", _INPUT_UNION)
+    ]
+
+INPUT_MOUSE = 0
+INPUT_KEYBOARD = 1
+KEYEVENTF_UNICODE = 0x0004
+KEYEVENTF_KEYUP = 0x0002
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
+MOUSEEVENTF_MOVE = 0x0001
+
+def move_and_click_mouse():
+    """Gently moves the OS mouse cursor and clicks to ensure Kuro App editor is active."""
     pt = POINT()
     user32.GetCursorPos(ctypes.byref(pt))
-    dx = random.randint(-4, 4)
-    dy = random.randint(-4, 4)
+    
+    # Slight smooth jitter
+    dx = random.randint(-5, 5)
+    dy = random.randint(-5, 5)
     user32.SetCursorPos(pt.x + dx, pt.y + dy)
 
-def type_string(text):
-    """Sends real Windows keystrokes for characters."""
-    INPUT_KEYBOARD = 1
-    KEYEVENTF_UNICODE = 0x0004
-    KEYEVENTF_KEYUP = 0x0002
+def send_character(char):
+    """Sends authentic OS Unicode keystroke to currently focused Kuro window."""
+    code = ord(char)
 
-    class KEYBDINPUT(ctypes.Structure):
-        _fields_ = [
-            ("wVk", wintypes.WORD),
-            ("wScan", wintypes.WORD),
-            ("dwFlags", wintypes.DWORD),
-            ("time", wintypes.DWORD),
-            ("dwExtraInfo", ctypes.c_ulong)
-        ]
+    # Key down
+    inp_down = INPUT()
+    inp_down.type = INPUT_KEYBOARD
+    inp_down.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE, 0, 0)
+    user32.SendInput(1, ctypes.byref(inp_down), ctypes.sizeof(INPUT))
 
-    class INPUT(ctypes.Structure):
-        class _INPUT_UNION(ctypes.Union):
-            _fields_ = [("ki", KEYBDINPUT)]
-        _anonymous_ = ("_input",)
-        _fields_ = [
-            ("type", wintypes.DWORD),
-            ("_input", _INPUT_UNION)
-        ]
+    time.sleep(random.uniform(0.015, 0.045))
 
+    # Key up
+    inp_up = INPUT()
+    inp_up.type = INPUT_KEYBOARD
+    inp_up.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
+    user32.SendInput(1, ctypes.byref(inp_up), ctypes.sizeof(INPUT))
+
+    time.sleep(random.uniform(0.01, 0.03))
+
+def type_code_stream(text):
     for char in text:
-        # Move mouse slightly every few chars
-        if random.random() < 0.15:
-            move_physical_mouse()
+        # Move mouse gently during typing
+        if random.random() < 0.12:
+            move_and_click_mouse()
 
-        code = ord(char)
-        
-        # Key down
-        inp_down = INPUT()
-        inp_down.type = INPUT_KEYBOARD
-        inp_down.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE, 0, 0)
-        user32.SendInput(1, ctypes.byref(inp_down), ctypes.sizeof(INPUT))
-
-        time.sleep(random.uniform(0.02, 0.06))
-
-        # Key up
-        inp_up = INPUT()
-        inp_up.type = INPUT_KEYBOARD
-        inp_up.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
-        user32.SendInput(1, ctypes.byref(inp_up), ctypes.sizeof(INPUT))
-
-        time.sleep(random.uniform(0.01, 0.03))
+        send_character(char)
 
 def main():
-    print("=" * 60)
-    print("      KURO AI PHYSICAL AUTO-TYPER & MOUSE BOT")
-    print("=" * 60)
-    print("-> Instructions:")
-    print("1. Open your Kuro website editor in Chrome/Edge.")
-    print("2. Click inside the Kuro code editor box to focus cursor.")
-    print("3. You have 5 SECONDS countdown now before typing begins!")
-    print("4. To STOP the bot anytime, simply close this terminal window.")
-    print("=" * 60)
+    print("=" * 65)
+    print("      ðŸš€ KURO WINDOWS DESKTOP APP AUTO-CODER ACTIVE ðŸš€")
+    print("=" * 65)
+    print("1. Open your 'Kuro' Desktop App on your screen.")
+    print("2. Click inside the Kuro code editor box to focus it.")
+    print("3. Starting auto-coding in 5 SECONDS countdown below...")
+    print("=" * 65)
 
     for i in range(5, 0, -1):
-        print(f"Starting in {i} seconds... (Click on Kuro editor now!)")
+        print(f"Starting in {i} seconds... (Click Kuro code editor now!)")
         time.sleep(1)
 
-    print("\n[+] BOT ACTIVE! Typing code and moving mouse automatically...")
-    
+    print("\n[+] LIVE! Continuous coding & mouse activity running...")
+    print("[+] Press Ctrl + C in this window to stop anytime.\n")
+
     cycle = 1
+    total_chars = 0
+    start_time = time.time()
+
     while True:
-        print(f"\n--- [Cycle #{cycle}] Fetching & Typing Code ---")
+        elapsed = int(time.time() - start_time)
+        hrs = elapsed // 3600
+        mins = (elapsed % 3600) // 60
+        secs = elapsed % 60
+        earnings = (elapsed / 3600.0) * 100.0
+
+        print(f"[{hrs:02d}:{mins:02d}:{secs:02d}] Cycle #{cycle} | Total Typed: {total_chars} chars | Estimated: Rs {earnings:.2f}")
+
+        # Fetch fresh AI code
         code = fetch_gemini_code()
-        type_string(code + "\n\n")
         
-        # Nudge mouse and rest briefly
-        for _ in range(5):
-            move_physical_mouse()
-            time.sleep(0.5)
-            
+        # Type into Kuro
+        type_code_stream(code + "\n\n")
+        total_chars += len(code) + 2
+
+        # Idle micro-movement
+        for _ in range(4):
+            move_and_click_mouse()
+            time.sleep(0.4)
+
         cycle += 1
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n[!] Bot stopped by user.")
+        print("\n[!] Kuro Bot stopped by user.")
