@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "name": "kuro-ai-autocoder",
+  "cleanUrls": true,
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}
