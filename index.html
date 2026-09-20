@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kuro AI | Live Auto-Coding & Earning Streamer</title>
+  <title>Kuro AI Studio | DeepSeek & ChatGPT Code Streamer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -11,12 +11,16 @@
 </head>
 <body>
 
-  <!-- Top App Navigation & Stats Bar -->
+  <!-- Top Navigation & Stats Bar -->
   <header class="top-header">
     <div class="brand-section">
       <div class="brand-logo">
         <div class="logo-icon">&lt;/&gt;</div>
         <span>KURO AI STUDIO</span>
+      </div>
+
+      <div class="model-badge">
+        <span>⚡ DeepSeek-R1 / Gemini Flash</span>
       </div>
 
       <div id="status-badge" class="status-badge paused">
@@ -38,35 +42,30 @@
       </div>
       <div class="stat-divider"></div>
       <div class="stat-item">
-        <span class="stat-label">Keystrokes</span>
-        <span id="stat-keystrokes" class="stat-value">0</span>
+        <span class="stat-label">AI Prompts Solved</span>
+        <span id="stat-prompts" class="stat-value">0</span>
       </div>
       <div class="stat-divider"></div>
       <div class="stat-item">
-        <span class="stat-label">Lines of Code</span>
-        <span id="stat-lines" class="stat-value">0</span>
+        <span class="stat-label">Keystrokes</span>
+        <span id="stat-keystrokes" class="stat-value">0</span>
       </div>
     </div>
 
-    <!-- Header Action Controls -->
+    <!-- Header Controls -->
     <div class="header-controls">
       <select id="speed-select" class="control-select" title="Typing Speed Profile">
-        <option value="human">👤 Human Natural (Jitter)</option>
-        <option value="fast" selected>⚡ Fast Developer</option>
+        <option value="human">👤 Human Natural</option>
+        <option value="fast" selected>⚡ Fast AI Stream</option>
         <option value="turbo">🚀 Cyberpunk Turbo</option>
-        <option value="instant">💥 Instant Chunks</option>
       </select>
 
-      <button id="btn-mouse" class="btn btn-primary" title="Toggle Simulated AI Ghost Cursor Movement">
-        <span>🖱️</span> Mouse Move: ON
+      <button id="btn-mouse" class="btn btn-primary" title="Toggle Square Mouse Simulator">
+        <span>⏹️</span> Square Mouse: ON
       </button>
 
       <button id="btn-sound" class="btn btn-secondary">
         <span>🔇</span> Sound Muted
-      </button>
-
-      <button id="btn-clear" class="btn btn-secondary" title="Clear Code Workspace">
-        <span>🗑️</span> Clear
       </button>
 
       <button id="btn-settings" class="btn btn-secondary" title="API Key & Rates Settings">
@@ -74,37 +73,45 @@
       </button>
 
       <button id="btn-toggle" class="btn btn-primary">
-        <span>▶️</span> Start Auto-Code
+        <span>▶️</span> Start AI Q&A Loop
       </button>
     </div>
   </header>
 
-  <!-- Virtual Ghost Mouse Cursor -->
-  <div id="ghost-cursor" class="ghost-cursor" style="transform: translate(250px, 300px);">
+  <!-- Virtual Ghost Mouse Cursor (Square Mover) -->
+  <div id="ghost-cursor" class="ghost-cursor" style="transform: translate(350px, 260px);">
     <svg class="ghost-cursor-svg" viewBox="0 0 24 24">
       <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.86a.5.5 0 0 0-.85.35z"/>
     </svg>
-    <div class="ghost-cursor-label">AI_DEV</div>
+    <div class="ghost-cursor-label">SQUARE_AI</div>
   </div>
 
-  <!-- Main IDE Workspace -->
+  <!-- Main Workspace Layout -->
   <main class="workspace-layout">
-    <!-- Left Explorer Sidebar -->
-    <aside class="sidebar">
-      <div class="sidebar-title">
-        <span>EXPLORER : KURO WORKSPACE</span>
+    <!-- Left AI Q&A Prompt Feed -->
+    <aside class="ai-sidebar">
+      <div class="ai-sidebar-header">
+        <span>💬 AI PROMPT HISTORY (CHATGPT/DEEPSEEK)</span>
       </div>
-      <ul id="file-list" class="file-list">
+      <div id="ai-prompt-list" class="ai-prompt-list">
         <!-- Injected via JavaScript -->
-      </ul>
+      </div>
     </aside>
 
-    <!-- Center Code Window -->
-    <section class="editor-container">
-      <div id="editor-tabs" class="editor-tabs">
-        <!-- Injected via JavaScript -->
+    <!-- Right Coding Canvas & Thinking Stream -->
+    <section class="ai-canvas">
+      <!-- DeepSeek Thinking Accordion -->
+      <div class="thinking-box">
+        <div class="thinking-header">
+          <div class="thinking-spinner"></div>
+          <span>Thinking Process & Reasoning...</span>
+        </div>
+        <div id="thinking-content" class="thinking-content">
+          Ready to synthesize production algorithms, data structures, and multi-threaded systems.
+        </div>
       </div>
 
+      <!-- Live Code Window -->
       <div id="code-window" class="code-window">
         <div id="line-numbers" class="line-numbers"></div>
         <div id="code-content" class="code-content" tabindex="0"></div>
@@ -113,25 +120,24 @@
       <!-- Bottom Terminal Output Console -->
       <footer class="bottom-panel">
         <div class="panel-header">
-          <span>TERMINAL & TELEMETRY LOGS</span>
-          <span id="ai-status" style="color: var(--accent-cyan);">Connecting...</span>
+          <span>CONSOLE & SQUARE MOUSE TELEMETRY</span>
+          <span id="ai-status" style="color: var(--deepseek-cyan);">Ready</span>
         </div>
         <div id="terminal-logs" class="terminal-logs"></div>
       </footer>
     </section>
   </main>
 
-  <!-- VS Code Style Status Bar -->
+  <!-- Status Bar -->
   <div class="footer-bar">
     <div class="footer-section">
-      <span class="footer-item"><span>🟢</span> Ready</span>
-      <span class="footer-item" id="footer-cursor-pos">Ln 1, Col 1</span>
-      <span class="footer-item">UTF-8</span>
+      <span>🟢 Engine: DeepSeek-R1 / Gemini Stream</span>
+      <span id="footer-cursor-pos">Ln 1, Col 1</span>
+      <span>UTF-8</span>
     </div>
     <div class="footer-section">
-      <span class="footer-item">Engine: <b id="status-lang" style="color: var(--accent-cyan);">PYTHON</b></span>
-      <span class="footer-item">Tab Size: 4</span>
-      <span class="footer-item">Keep-Alive: Active</span>
+      <span>Square Mouse: Active</span>
+      <span>Anti-Throttle: ON</span>
     </div>
   </div>
 
@@ -146,13 +152,10 @@
         <div class="form-group">
           <label class="form-label" for="input-api-key">Gemini API Key</label>
           <input type="password" id="input-api-key" class="form-input" placeholder="AIzaSy...">
-          <span class="form-help">Your API key is saved locally in your browser. Never sent to any external server.</span>
         </div>
-
         <div class="form-group">
           <label class="form-label" for="input-hourly-rate">Hourly Rate Tracker (₹ / hr)</label>
           <input type="number" id="input-hourly-rate" class="form-input" value="100" min="1">
-          <span class="form-help">Live earning counter calculates your rate per second (default ₹100/hr = ₹0.0278/sec).</span>
         </div>
       </div>
       <div class="modal-footer">
