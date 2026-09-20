@@ -1,9 +1,10 @@
 """
-KURO WINDOWS APP AUTO-TYPER & REALISTIC SQUARE MOUSE ENGINE
-- Types real Gemini AI code directly into Kuro Desktop App.
-- Moves the real physical mouse in smooth, realistic square/geometric patterns.
-- Includes micro-jitter, wheel scrolling, and human typing cadence.
-- 100% Native Windows Win32 API (No external pip packages needed).
+KURO WINDOWS APP - AI PROMPT & CODE STREAMER BOT
+Simulates a real developer workflow like ChatGPT / DeepSeek / Claude:
+1. Types a realistic coding prompt / question with comment tags.
+2. Simulates "Thinking & Generating..." pause with square mouse inspection.
+3. Streams the complete, production-grade code response character-by-character.
+4. Smooth square mouse movement to keep Kuro App active and rewarded.
 """
 
 import os
@@ -21,95 +22,263 @@ kernel32 = ctypes.windll.kernel32
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 
-FALLBACK_CODE = [
-    """def binary_search(arr, target):
-    low = 0
-    high = len(arr) - 1
-    while low <= high:
-        mid = (low + high) // 2
-        if arr[mid] == target:
-            return mid
-        elif arr[mid] < target:
-            low = mid + 1
-        else:
-            high = mid - 1
-    return -1
+PROMPT_LIBRARY = [
+    {
+        "prompt": "Create a high-performance LRU Cache with O(1) get and put operations in Python.",
+        "code": """class Node:
+    def __init__(self, key, value):
+        self.key = key
+        self.value = value
+        self.prev = None
+        self.next = None
 
-sample_data = [10, 23, 45, 70, 89, 102, 145]
-index = binary_search(sample_data, 70)
-print(f"Target found at index: {index}")
-""",
-    """import asyncio
-import time
+class LRUCache:
+    def __init__(self, capacity: int):
+        self.capacity = capacity
+        self.cache = {}
+        self.head = Node(0, 0)
+        self.tail = Node(0, 0)
+        self.head.next = self.tail
+        self.tail.prev = self.head
 
-class TaskScheduler:
-    def __init__(self):
-        self.queue = []
+    def _remove(self, node):
+        prev = node.prev
+        nxt = node.next
+        prev.next = nxt
+        nxt.prev = prev
 
-    async def execute_task(self, name, duration):
-        print(f"[START] Executing task: {name}")
-        await asyncio.sleep(duration)
-        print(f"[DONE] Task {name} finished after {duration}s")
-        return {"task": name, "status": "COMPLETED"}
+    def _add(self, node):
+        nxt = self.head.next
+        self.head.next = node
+        node.prev = self.head
+        node.next = nxt
+        nxt.prev = node
 
-    async def run_all(self):
-        tasks = [self.execute_task(f"Worker-{i}", 0.3) for i in range(1, 6)]
-        return await asyncio.gather(*tasks)
+    def get(self, key: int) -> int:
+        if key in self.cache:
+            node = self.cache[key]
+            self._remove(node)
+            self._add(node)
+            return node.value
+        return -1
 
-if __name__ == "__main__":
-    scheduler = TaskScheduler()
-    asyncio.run(scheduler.run_all())
-""",
-    """function throttle(func, limit) {
-  let inThrottle;
-  return function(...args) {
-    if (!inThrottle) {
-      func.apply(this, args);
-      inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
+    def put(self, key: int, value: int) -> None:
+        if key in self.cache:
+            self._remove(self.cache[key])
+        node = Node(key, value)
+        self._add(node)
+        self.cache[key] = node
+        if len(self.cache) > self.capacity:
+            lru = self.tail.prev
+            self._remove(lru)
+            del self.cache[lru.key]
+
+# Testing LRU Cache Implementation
+cache = LRUCache(2)
+cache.put(1, 100)
+cache.put(2, 200)
+print("Get 1:", cache.get(1))
+cache.put(3, 300)
+print("Get 2 (evicted):", cache.get(2))
+"""
+    },
+    {
+        "prompt": "Write a WebSocket real-time pub/sub client with auto-reconnection in JavaScript.",
+        "code": """class ResilientWebSocketClient {
+  constructor(url, options = {}) {
+    this.url = url;
+    this.reconnectInterval = options.reconnectInterval || 3000;
+    this.maxRetries = options.maxRetries || 10;
+    this.retryCount = 0;
+    this.subscriptions = new Map();
+    this.ws = null;
+    this.init();
+  }
+
+  init() {
+    this.ws = new WebSocket(this.url);
+    this.ws.onopen = () => {
+      console.log('[WS] Connected successfully to telemetry server.');
+      this.retryCount = 0;
+      this.resubscribeAll();
+    };
+
+    this.ws.onmessage = (event) => {
+      try {
+        const { channel, payload } = JSON.parse(event.data);
+        if (this.subscriptions.has(channel)) {
+          this.subscriptions.get(channel).forEach(cb => cb(payload));
+        }
+      } catch (err) {
+        console.error('[WS] Parse error:', err);
+      }
+    };
+
+    this.ws.onclose = () => {
+      console.warn('[WS] Connection closed. Attempting reconnect...');
+      this.handleReconnect();
+    };
+  }
+
+  handleReconnect() {
+    if (this.retryCount < this.maxRetries) {
+      this.retryCount++;
+      setTimeout(() => this.init(), this.reconnectInterval);
     }
-  };
+  }
+
+  subscribe(channel, callback) {
+    if (!this.subscriptions.has(channel)) {
+      this.subscriptions.set(channel, []);
+    }
+    this.subscriptions.get(channel).push(callback);
+  }
+
+  resubscribeAll() {
+    for (const channel of this.subscriptions.keys()) {
+      if (this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ action: 'subscribe', channel }));
+      }
+    }
+  }
 }
-
-const logMouseActivity = throttle((x, y) => {
-  console.log(`Telemetry coordinates: X=${x}, Y=${y}`);
-}, 300);
-window.addEventListener('mousemove', (e) => logMouseActivity(e.clientX, e.clientY));
-""",
-    """#include <iostream>
+"""
+    },
+    {
+        "prompt": "Implement a Thread-Safe Concurrent Queue in C++ with condition variables.",
+        "code": """#include <iostream>
+#include <queue>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
 #include <vector>
-#include <numeric>
 
-using namespace std;
+template <typename T>
+class ConcurrentQueue {
+private:
+    std::queue<T> queue_;
+    mutable std::mutex mutex_;
+    std::condition_variable cond_;
+
+public:
+    void push(T value) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        queue_.push(std::move(value));
+        cond_.notify_one();
+    }
+
+    bool pop(T& value) {
+        std::unique_lock<std::mutex> lock(mutex_);
+        cond_.wait(lock, [this] { return !queue_.empty(); });
+        value = std::move(queue_.front());
+        queue_.pop();
+        return true;
+    }
+
+    bool empty() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return queue_.empty();
+    }
+};
 
 int main() {
-    vector<double> scores = {88.5, 92.0, 79.5, 95.0, 84.0};
-    double sum = accumulate(scores.begin(), scores.end(), 0.0);
-    double avg = sum / scores.size();
-    cout << "Calculated Score Average: " << avg << endl;
+    ConcurrentQueue<int> taskQueue;
+    std::vector<std::thread> producers;
+    for (int i = 0; i < 3; ++i) {
+        producers.emplace_back([&taskQueue, i] {
+            taskQueue.push(i * 10);
+        });
+    }
+    for (auto& p : producers) p.join();
     return 0;
 }
 """
+    },
+    {
+        "prompt": "Design a Distributed Token Bucket Rate Limiter with Redis in Python.",
+        "code": """import time
+import redis
+
+class RedisTokenBucketRateLimiter:
+    def __init__(self, redis_client, key_prefix="rate_limit:", capacity=60, fill_rate=1.0):
+        self.client = redis_client
+        self.prefix = key_prefix
+        self.capacity = capacity
+        self.fill_rate = fill_rate
+
+    def is_allowed(self, user_id: str, tokens_requested: int = 1) -> bool:
+        key = f"{self.prefix}{user_id}"
+        now = time.time()
+        
+        pipe = self.client.pipeline()
+        pipe.hgetall(key)
+        res = pipe.execute()[0]
+
+        if not res:
+            tokens = self.capacity - tokens_requested
+            last_updated = now
+            self.client.hset(key, mapping={"tokens": tokens, "last_updated": last_updated})
+            return True
+
+        last_tokens = float(res.get(b"tokens", self.capacity))
+        last_updated = float(res.get(b"last_updated", now))
+
+        # Calculate replenished tokens
+        elapsed = now - last_updated
+        current_tokens = min(self.capacity, last_tokens + elapsed * self.fill_rate)
+
+        if current_tokens >= tokens_requested:
+            current_tokens -= tokens_requested
+            self.client.hset(key, mapping={"tokens": current_tokens, "last_updated": now})
+            return True
+        return False
+"""
+    }
 ]
 
-def fetch_gemini_code():
+AI_TOPICS = [
+    "Write a complete A* pathfinding algorithm on 2D grid with visualization in Python",
+    "Build a custom reactive State Management Store similar to Zustand in TypeScript/JavaScript",
+    "Write an async task queue worker pipeline with retry exponential backoff in Python",
+    "Implement an efficient Trie (Prefix Tree) with auto-complete search in C++",
+    "Create a JWT authentication middleware with CSRF protection in Node.js/Express",
+    "Write a Convolutional Neural Network forward pass from scratch in Python",
+    "Implement a Memory-Mapped File IPC mechanism in C++"
+]
+
+def fetch_ai_prompt_and_code():
+    chosen_topic = random.choice(AI_TOPICS)
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         headers = {"Content-Type": "application/json"}
+        prompt_instruction = f"""Generate a detailed, realistic user coding question/prompt about: "{chosen_topic}".
+Then provide the complete, clean, professional code solution.
+Format your output EXACTLY as:
+PROMPT: <The user question / task prompt>
+CODE:
+<The complete pure code solution without backticks>"""
+
         payload = json.dumps({
-            "contents": [{"parts": [{"text": "Write 20-30 lines of clean real python or javascript code with functions and comments. No markdown code blocks."}]}]
+            "contents": [{"parts": [{"text": prompt_instruction}]}],
+            "generationConfig": {
+                "temperature": 0.7,
+                "maxOutputTokens": 1400
+            }
         }).encode("utf-8")
 
         req = urllib.request.Request(url, data=payload, headers=headers)
-        with urllib.request.urlopen(req, timeout=8) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             text = res_data["candidates"][0]["content"]["parts"][0]["text"]
-            text = text.replace("```python", "").replace("```javascript", "").replace("```", "").strip()
-            if len(text) > 20:
-                return text
+            
+            if "PROMPT:" in text and "CODE:" in text:
+                parts = text.split("CODE:")
+                prompt_part = parts[0].replace("PROMPT:", "").strip()
+                code_part = parts[1].replace("```python", "").replace("```javascript", "").replace("```cpp", "").replace("```", "").strip()
+                return {"prompt": prompt_part, "code": code_part}
     except Exception as e:
         pass
-    return random.choice(FALLBACK_CODE)
+    return random.choice(PROMPT_LIBRARY)
 
 class POINT(ctypes.Structure):
     _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
@@ -146,8 +315,6 @@ INPUT_MOUSE = 0
 INPUT_KEYBOARD = 1
 KEYEVENTF_UNICODE = 0x0004
 KEYEVENTF_KEYUP = 0x0002
-MOUSEEVENTF_MOVE = 0x0001
-MOUSEEVENTF_WHEEL = 0x0800
 
 def get_mouse_pos():
     pt = POINT()
@@ -157,11 +324,9 @@ def get_mouse_pos():
 def set_mouse_pos(x, y):
     user32.SetCursorPos(int(x), int(y))
 
-def move_mouse_smooth(start_x, start_y, target_x, target_y, steps=10, delay=0.008):
-    """Interpolates smoothly between two points with human-like deceleration."""
+def move_mouse_smooth(start_x, start_y, target_x, target_y, steps=10, delay=0.007):
     for step in range(1, steps + 1):
         t = step / steps
-        # Smooth easeInOut curve
         ease = t * t * (3.0 - 2.0 * t)
         curr_x = start_x + (target_x - start_x) * ease
         curr_y = start_y + (target_y - start_y) * ease
@@ -169,71 +334,66 @@ def move_mouse_smooth(start_x, start_y, target_x, target_y, steps=10, delay=0.00
         time.sleep(delay)
 
 def draw_square_mouse_motion(side_length=70, duration_speed=0.006):
-    """
-    Moves the real physical mouse in a clearly visible, smooth square pattern
-    around its current position (Right -> Down -> Left -> Up).
-    """
+    """Draws a smooth visible square on screen."""
     origin_x, origin_y = get_mouse_pos()
-    
-    # 4 corners of the square:
-    # 1. Top-Right: (origin_x + side, origin_y)
-    # 2. Bottom-Right: (origin_x + side, origin_y + side)
-    # 3. Bottom-Left: (origin_x, origin_y + side)
-    # 4. Top-Left (Back to origin): (origin_x, origin_y)
-    
     corners = [
         (origin_x + side_length, origin_y),
         (origin_x + side_length, origin_y + side_length),
         (origin_x, origin_y + side_length),
         (origin_x, origin_y)
     ]
-    
     current_x, current_y = origin_x, origin_y
     for target_x, target_y in corners:
         move_mouse_smooth(current_x, current_y, target_x, target_y, steps=12, delay=duration_speed)
         current_x, current_y = target_x, target_y
-        time.sleep(0.02) # Micro pause at corners like human movement
+        time.sleep(0.015)
 
 def send_character(char):
-    """Sends authentic OS Unicode keystroke to currently focused Kuro window."""
     code = ord(char)
-
-    # Key down
     inp_down = INPUT()
     inp_down.type = INPUT_KEYBOARD
     inp_down.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE, 0, 0)
     user32.SendInput(1, ctypes.byref(inp_down), ctypes.sizeof(INPUT))
 
-    time.sleep(random.uniform(0.015, 0.04))
+    time.sleep(random.uniform(0.012, 0.035))
 
-    # Key up
     inp_up = INPUT()
     inp_up.type = INPUT_KEYBOARD
     inp_up.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
     user32.SendInput(1, ctypes.byref(inp_up), ctypes.sizeof(INPUT))
 
-    time.sleep(random.uniform(0.01, 0.025))
+    time.sleep(random.uniform(0.008, 0.02))
+
+def type_text(text, speed_multiplier=1.0):
+    for char in text:
+        send_character(char)
+        if random.random() < 0.05:
+            time.sleep(random.uniform(0.05, 0.12))
 
 def main():
-    print("=" * 68)
-    print("      ðŸš€ KURO AUTO-TYPER & REALISTIC SQUARE MOUSE ENGINE ðŸš€")
-    print("=" * 68)
-    print("1. Open your 'Kuro' Desktop App on your screen.")
-    print("2. Click inside the Kuro code editor box to place cursor.")
-    print("3. Starting auto-coding & square mouse movement in 5 SECONDS...")
-    print("=" * 68)
+    print("=" * 70)
+    print("    ðŸ¤– KURO AI: CHATGPT / DEEPSEEK STYLE PROMPT & CODE ENGINE ðŸ¤–")
+    print("=" * 70)
+    print("-> How it works:")
+    print("1. Types realistic Coding Questions / Prompts (like user asking ChatGPT/DeepSeek).")
+    print("2. Simulates Thinking & Code Synthesis with smooth Square Mouse inspection.")
+    print("3. Streams the complete clean code solution into Kuro App.")
+    print("4. Keeps Kuro App 100% active with square mouse motions to credit earnings.")
+    print("=" * 70)
+    print("Click inside the Kuro Desktop App coding editor now!")
+    print("Starting in 5 SECONDS countdown...")
+    print("=" * 70)
 
     for i in range(5, 0, -1):
-        print(f"Starting in {i} seconds... (Click Kuro code editor now!)")
+        print(f"Starting in {i} seconds... (Focus Kuro editor now!)")
         time.sleep(1)
 
-    print("\n[+] LIVE! Continuous coding & square mouse motions active...")
-    print("[+] Watch your mouse cursor move in smooth visible squares!")
+    print("\n[+] BOT LIVE! Running interactive Q&A Coding Cycles...\n")
     print("[+] Press Ctrl + C in this window to stop anytime.\n")
 
     cycle = 1
-    total_chars = 0
     start_time = time.time()
+    total_chars = 0
 
     while True:
         elapsed = int(time.time() - start_time)
@@ -242,30 +402,42 @@ def main():
         secs = elapsed % 60
         earnings = (elapsed / 3600.0) * 100.0
 
-        print(f"[{hrs:02d}:{mins:02d}:{secs:02d}] Cycle #{cycle} | Typed: {total_chars} chars | Estimated: Rs {earnings:.2f}")
+        item = fetch_ai_prompt_and_code()
+        user_prompt = item["prompt"]
+        ai_code = item["code"]
 
-        # Fetch fresh AI code
-        code = fetch_gemini_code()
+        print(f"[{hrs:02d}:{mins:02d}:{secs:02d}] Cycle #{cycle} | Earned: Rs {earnings:.2f}")
+        print(f"  [Q] Question: {user_prompt[:60]}...")
+
+        # 1. Type the User Prompt as a comment / prompt header
+        header = f"\n# ========================================================\n" \
+                 f"# [USER PROMPT / QUERY]:\n" \
+                 f"# {user_prompt}\n" \
+                 f"# ========================================================\n" \
+                 f"# [AI ASSISTANT (DeepSeek/ChatGPT) RESPONSE]:\n\n"
         
-        # Type code in small sentences/lines, executing square mouse motions in between
-        lines = code.split("\n")
+        type_text(header)
+        total_chars += len(header)
+
+        # 2. Simulate AI "Thinking" pause with a visible square mouse motion
+        print("  [*] Simulating AI Thinking & Code Generation...")
+        draw_square_mouse_motion(side_length=random.randint(60, 95))
+        time.sleep(0.5)
+
+        # 3. Stream the code response line by line
+        lines = ai_code.split("\n")
         for line in lines:
-            for char in line:
-                send_character(char)
-            send_character("\n")
+            type_text(line + "\n")
+            total_chars += len(line) + 1
 
-            # Perform a smooth, visible square mouse motion after lines
-            if random.random() < 0.65:
-                # Square side between 50 to 90 pixels (clearly visible & human-like)
-                sq_size = random.randint(50, 90)
-                draw_square_mouse_motion(side_length=sq_size)
+            # Square movement during code streaming
+            if random.random() < 0.35:
+                draw_square_mouse_motion(side_length=random.randint(50, 85))
 
-        total_chars += len(code) + 2
-
-        # End of cycle square movement & brief pause
-        draw_square_mouse_motion(side_length=80)
-        time.sleep(0.8)
-
+        # 4. End of cycle inspection
+        draw_square_mouse_motion(side_length=75)
+        print(f"  [âœ“] Cycle #{cycle} completed successfully!\n")
+        time.sleep(1.2)
         cycle += 1
 
 if __name__ == "__main__":
