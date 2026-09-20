@@ -1,7 +1,9 @@
 """
-KURO WINDOWS APP AUTO-TYPER & PHYSICAL MOUSE ENGINE
-Specialized for KuroWindows desktop application.
-Uses native Windows Win32 API (Zero pip dependencies).
+KURO WINDOWS APP AUTO-TYPER & REALISTIC SQUARE MOUSE ENGINE
+- Types real Gemini AI code directly into Kuro Desktop App.
+- Moves the real physical mouse in smooth, realistic square/geometric patterns.
+- Includes micro-jitter, wheel scrolling, and human typing cadence.
+- 100% Native Windows Win32 API (No external pip packages needed).
 """
 
 import os
@@ -10,6 +12,7 @@ import json
 import random
 import sys
 import time
+import math
 import urllib.request
 from ctypes import wintypes
 
@@ -19,64 +22,71 @@ kernel32 = ctypes.windll.kernel32
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "YOUR_GEMINI_API_KEY")
 
 FALLBACK_CODE = [
-    """def quick_sort(arr):
-    if len(arr) <= 1:
-        return arr
-    pivot = arr[len(arr) // 2]
-    left = [x for x in arr if x < pivot]
-    middle = [x for x in arr if x == pivot]
-    right = [x for x in arr if x > pivot]
-    return quick_sort(left) + middle + quick_sort(right)
+    """def binary_search(arr, target):
+    low = 0
+    high = len(arr) - 1
+    while low <= high:
+        mid = (low + high) // 2
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            low = mid + 1
+        else:
+            high = mid - 1
+    return -1
 
-numbers = [38, 27, 43, 3, 9, 82, 10]
-print("Sorted output:", quick_sort(numbers))
+sample_data = [10, 23, 45, 70, 89, 102, 145]
+index = binary_search(sample_data, 70)
+print(f"Target found at index: {index}")
 """,
     """import asyncio
 import time
 
-async def worker_task(task_id, delay):
-    print(f"Starting async worker task #{task_id}...")
-    await asyncio.sleep(delay)
-    return f"Task #{task_id} completed successfully at {time.time()}"
+class TaskScheduler:
+    def __init__(self):
+        self.queue = []
 
-async def main():
-    tasks = [worker_task(i, 0.5) for i in range(1, 6)]
-    results = await asyncio.gather(*tasks)
-    for res in results:
-        print(res)
+    async def execute_task(self, name, duration):
+        print(f"[START] Executing task: {name}")
+        await asyncio.sleep(duration)
+        print(f"[DONE] Task {name} finished after {duration}s")
+        return {"task": name, "status": "COMPLETED"}
+
+    async def run_all(self):
+        tasks = [self.execute_task(f"Worker-{i}", 0.3) for i in range(1, 6)]
+        return await asyncio.gather(*tasks)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    scheduler = TaskScheduler()
+    asyncio.run(scheduler.run_all())
 """,
-    """function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
+    """function throttle(func, limit) {
+  let inThrottle;
+  return function(...args) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
   };
 }
 
-const handleResize = debounce(() => {
-  console.log('Window resized efficiently');
-}, 250);
-window.addEventListener('resize', handleResize);
+const logMouseActivity = throttle((x, y) => {
+  console.log(`Telemetry coordinates: X=${x}, Y=${y}`);
+}, 300);
+window.addEventListener('mousemove', (e) => logMouseActivity(e.clientX, e.clientY));
 """,
     """#include <iostream>
 #include <vector>
-#include <algorithm>
+#include <numeric>
 
 using namespace std;
 
 int main() {
-    vector<int> v = {4, 2, 5, 1, 3};
-    sort(v.begin(), v.end());
-    for(int n : v) {
-        cout << "Element: " << n << endl;
-    }
+    vector<double> scores = {88.5, 92.0, 79.5, 95.0, 84.0};
+    double sum = accumulate(scores.begin(), scores.end(), 0.0);
+    double avg = sum / scores.size();
+    cout << "Calculated Score Average: " << avg << endl;
     return 0;
 }
 """
@@ -87,7 +97,7 @@ def fetch_gemini_code():
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
         headers = {"Content-Type": "application/json"}
         payload = json.dumps({
-            "contents": [{"parts": [{"text": "Write 20-30 lines of clean real python or javascript code for algorithmic tasks. No markdown code blocks."}]}]
+            "contents": [{"parts": [{"text": "Write 20-30 lines of clean real python or javascript code with functions and comments. No markdown code blocks."}]}]
         }).encode("utf-8")
 
         req = urllib.request.Request(url, data=payload, headers=headers)
@@ -136,19 +146,53 @@ INPUT_MOUSE = 0
 INPUT_KEYBOARD = 1
 KEYEVENTF_UNICODE = 0x0004
 KEYEVENTF_KEYUP = 0x0002
-MOUSEEVENTF_LEFTDOWN = 0x0002
-MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_MOVE = 0x0001
+MOUSEEVENTF_WHEEL = 0x0800
 
-def move_and_click_mouse():
-    """Gently moves the OS mouse cursor and clicks to ensure Kuro App editor is active."""
+def get_mouse_pos():
     pt = POINT()
     user32.GetCursorPos(ctypes.byref(pt))
+    return pt.x, pt.y
+
+def set_mouse_pos(x, y):
+    user32.SetCursorPos(int(x), int(y))
+
+def move_mouse_smooth(start_x, start_y, target_x, target_y, steps=10, delay=0.008):
+    """Interpolates smoothly between two points with human-like deceleration."""
+    for step in range(1, steps + 1):
+        t = step / steps
+        # Smooth easeInOut curve
+        ease = t * t * (3.0 - 2.0 * t)
+        curr_x = start_x + (target_x - start_x) * ease
+        curr_y = start_y + (target_y - start_y) * ease
+        set_mouse_pos(curr_x, curr_y)
+        time.sleep(delay)
+
+def draw_square_mouse_motion(side_length=70, duration_speed=0.006):
+    """
+    Moves the real physical mouse in a clearly visible, smooth square pattern
+    around its current position (Right -> Down -> Left -> Up).
+    """
+    origin_x, origin_y = get_mouse_pos()
     
-    # Slight smooth jitter
-    dx = random.randint(-5, 5)
-    dy = random.randint(-5, 5)
-    user32.SetCursorPos(pt.x + dx, pt.y + dy)
+    # 4 corners of the square:
+    # 1. Top-Right: (origin_x + side, origin_y)
+    # 2. Bottom-Right: (origin_x + side, origin_y + side)
+    # 3. Bottom-Left: (origin_x, origin_y + side)
+    # 4. Top-Left (Back to origin): (origin_x, origin_y)
+    
+    corners = [
+        (origin_x + side_length, origin_y),
+        (origin_x + side_length, origin_y + side_length),
+        (origin_x, origin_y + side_length),
+        (origin_x, origin_y)
+    ]
+    
+    current_x, current_y = origin_x, origin_y
+    for target_x, target_y in corners:
+        move_mouse_smooth(current_x, current_y, target_x, target_y, steps=12, delay=duration_speed)
+        current_x, current_y = target_x, target_y
+        time.sleep(0.02) # Micro pause at corners like human movement
 
 def send_character(char):
     """Sends authentic OS Unicode keystroke to currently focused Kuro window."""
@@ -160,7 +204,7 @@ def send_character(char):
     inp_down.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE, 0, 0)
     user32.SendInput(1, ctypes.byref(inp_down), ctypes.sizeof(INPUT))
 
-    time.sleep(random.uniform(0.015, 0.045))
+    time.sleep(random.uniform(0.015, 0.04))
 
     # Key up
     inp_up = INPUT()
@@ -168,30 +212,23 @@ def send_character(char):
     inp_up.ki = KEYBDINPUT(0, code, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0)
     user32.SendInput(1, ctypes.byref(inp_up), ctypes.sizeof(INPUT))
 
-    time.sleep(random.uniform(0.01, 0.03))
-
-def type_code_stream(text):
-    for char in text:
-        # Move mouse gently during typing
-        if random.random() < 0.12:
-            move_and_click_mouse()
-
-        send_character(char)
+    time.sleep(random.uniform(0.01, 0.025))
 
 def main():
-    print("=" * 65)
-    print("      ðŸš€ KURO WINDOWS DESKTOP APP AUTO-CODER ACTIVE ðŸš€")
-    print("=" * 65)
+    print("=" * 68)
+    print("      ðŸš€ KURO AUTO-TYPER & REALISTIC SQUARE MOUSE ENGINE ðŸš€")
+    print("=" * 68)
     print("1. Open your 'Kuro' Desktop App on your screen.")
-    print("2. Click inside the Kuro code editor box to focus it.")
-    print("3. Starting auto-coding in 5 SECONDS countdown below...")
-    print("=" * 65)
+    print("2. Click inside the Kuro code editor box to place cursor.")
+    print("3. Starting auto-coding & square mouse movement in 5 SECONDS...")
+    print("=" * 68)
 
     for i in range(5, 0, -1):
         print(f"Starting in {i} seconds... (Click Kuro code editor now!)")
         time.sleep(1)
 
-    print("\n[+] LIVE! Continuous coding & mouse activity running...")
+    print("\n[+] LIVE! Continuous coding & square mouse motions active...")
+    print("[+] Watch your mouse cursor move in smooth visible squares!")
     print("[+] Press Ctrl + C in this window to stop anytime.\n")
 
     cycle = 1
@@ -205,19 +242,29 @@ def main():
         secs = elapsed % 60
         earnings = (elapsed / 3600.0) * 100.0
 
-        print(f"[{hrs:02d}:{mins:02d}:{secs:02d}] Cycle #{cycle} | Total Typed: {total_chars} chars | Estimated: Rs {earnings:.2f}")
+        print(f"[{hrs:02d}:{mins:02d}:{secs:02d}] Cycle #{cycle} | Typed: {total_chars} chars | Estimated: Rs {earnings:.2f}")
 
         # Fetch fresh AI code
         code = fetch_gemini_code()
         
-        # Type into Kuro
-        type_code_stream(code + "\n\n")
+        # Type code in small sentences/lines, executing square mouse motions in between
+        lines = code.split("\n")
+        for line in lines:
+            for char in line:
+                send_character(char)
+            send_character("\n")
+
+            # Perform a smooth, visible square mouse motion after lines
+            if random.random() < 0.65:
+                # Square side between 50 to 90 pixels (clearly visible & human-like)
+                sq_size = random.randint(50, 90)
+                draw_square_mouse_motion(side_length=sq_size)
+
         total_chars += len(code) + 2
 
-        # Idle micro-movement
-        for _ in range(4):
-            move_and_click_mouse()
-            time.sleep(0.4)
+        # End of cycle square movement & brief pause
+        draw_square_mouse_motion(side_length=80)
+        time.sleep(0.8)
 
         cycle += 1
 
