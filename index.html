@@ -57,6 +57,10 @@
         <option value="instant">💥 Instant Chunks</option>
       </select>
 
+      <button id="btn-mouse" class="btn btn-primary" title="Toggle Simulated AI Ghost Cursor Movement">
+        <span>🖱️</span> Mouse Move: ON
+      </button>
+
       <button id="btn-sound" class="btn btn-secondary">
         <span>🔇</span> Sound Muted
       </button>
@@ -74,6 +78,14 @@
       </button>
     </div>
   </header>
+
+  <!-- Virtual Ghost Mouse Cursor -->
+  <div id="ghost-cursor" class="ghost-cursor" style="transform: translate(250px, 300px);">
+    <svg class="ghost-cursor-svg" viewBox="0 0 24 24">
+      <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.86a.5.5 0 0 0-.85.35z"/>
+    </svg>
+    <div class="ghost-cursor-label">AI_DEV</div>
+  </div>
 
   <!-- Main IDE Workspace -->
   <main class="workspace-layout">
