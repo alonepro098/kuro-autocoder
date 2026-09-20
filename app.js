@@ -1,9 +1,8 @@
-// Kuro AI Auto-Coding Streamer & Background Earning Simulator
-
 // Application State
 const state = {
   isRunning: false,
   soundEnabled: false,
+  mouseMovementEnabled: true,
   speed: 'fast', // 'human', 'fast', 'turbo', 'instant'
   hourlyRate: 100, // ₹100 per hour default
   apiKey: localStorage.getItem('kuro_gemini_api_key') || '',
@@ -15,6 +14,8 @@ const state = {
   currentCodeBuffer: '',
   bufferIndex: 0,
   isFetchingAI: false,
+  mousePos: { x: 300, y: 300 },
+  targetMousePos: { x: 300, y: 300 },
   files: {
     'script.py': { lang: 'python', name: 'script.py', icon: '🐍' },
     'App.jsx': { lang: 'javascript', name: 'App.jsx', icon: '⚛️' },
@@ -389,6 +390,118 @@ function dispatchKeystrokeActivity(char) {
     // Also trigger custom activity heartbeat
     window.dispatchEvent(new CustomEvent('kuro_activity_heartbeat', { detail: { time: Date.now() } }));
   } catch (e) {}
+}
+
+// AI Ghost Mouse Cursor Engine
+function initGhostMouse() {
+  const cursorEl = document.getElementById('ghost-cursor');
+
+  // Random new mouse target every 1.5 - 3.5 seconds
+  function pickNewMouseTarget() {
+    if (!state.mouseMovementEnabled || !state.isRunning) return;
+
+    // Target interesting elements on screen (editor area, tabs, file list, buttons)
+    const targets = [
+      document.getElementById('code-window'),
+      document.getElementById('editor-tabs'),
+      document.getElementById('file-list'),
+      document.querySelector('.stat-value.earning-highlight'),
+      document.querySelector('.sidebar-title')
+    ].filter(Boolean);
+
+    let targetX = Math.random() * (window.innerWidth - 100) + 50;
+    let targetY = Math.random() * (window.innerHeight - 100) + 50;
+
+    if (targets.length && Math.random() > 0.3) {
+      const chosen = targets[Math.floor(Math.random() * targets.length)];
+      const rect = chosen.getBoundingClientRect();
+      targetX = rect.left + Math.random() * rect.width;
+      targetY = rect.top + Math.random() * rect.height;
+    }
+
+    state.targetMousePos = { x: targetX, y: targetY };
+
+    // Chance to simulate a subtle click or scroll
+    if (Math.random() > 0.5) {
+      setTimeout(() => triggerSimulatedMouseAction(targetX, targetY), 800);
+    }
+
+    setTimeout(pickNewMouseTarget, Math.random() * 2000 + 1200);
+  }
+
+  // Smooth frame interpolation for mouse movement
+  function renderMouseFrame() {
+    if (state.mouseMovementEnabled && cursorEl) {
+      cursorEl.style.display = 'flex';
+      // Smooth lerp (linear interpolation)
+      state.mousePos.x += (state.targetMousePos.x - state.mousePos.x) * 0.12;
+      state.mousePos.y += (state.targetMousePos.y - state.mousePos.y) * 0.12;
+
+      cursorEl.style.transform = `translate(${state.mousePos.x}px, ${state.mousePos.y}px)`;
+
+      // Dispatch continuous real DOM MouseMove & PointerMove events
+      dispatchSyntheticMouseEvent('mousemove', state.mousePos.x, state.mousePos.y);
+      dispatchSyntheticMouseEvent('pointermove', state.mousePos.x, state.mousePos.y);
+    } else if (cursorEl) {
+      cursorEl.style.display = 'none';
+    }
+    requestAnimationFrame(renderMouseFrame);
+  }
+
+  pickNewMouseTarget();
+  renderMouseFrame();
+}
+
+// Dispatch real browser DOM Mouse & Pointer events to elements under cursor
+function dispatchSyntheticMouseEvent(eventType, x, y) {
+  try {
+    const targetElement = document.elementFromPoint(x, y) || document.body;
+    const event = new MouseEvent(eventType, {
+      view: window,
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+      screenX: x,
+      screenY: y
+    });
+    targetElement.dispatchEvent(event);
+
+    const pointerEvent = new PointerEvent(eventType.replace('mouse', 'pointer'), {
+      view: window,
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+      pointerType: 'mouse',
+      isPrimary: true
+    });
+    targetElement.dispatchEvent(pointerEvent);
+  } catch (err) {}
+}
+
+// Trigger realistic click & ripple
+function triggerSimulatedMouseAction(x, y) {
+  if (!state.mouseMovementEnabled || !state.isRunning) return;
+
+  dispatchSyntheticMouseEvent('mousedown', x, y);
+  dispatchSyntheticMouseEvent('mouseup', x, y);
+
+  // Create subtle visual ripple
+  const ripple = document.createElement('div');
+  ripple.className = 'ghost-click-ripple';
+  ripple.style.left = `${x}px`;
+  ripple.style.top = `${y}px`;
+  document.body.appendChild(ripple);
+  setTimeout(() => ripple.remove(), 600);
+
+  // Subtle editor scroll jitter
+  const codeWindow = document.getElementById('code-window');
+  if (codeWindow && Math.random() > 0.4) {
+    const scrollDelta = (Math.random() - 0.3) * 60;
+    codeWindow.scrollTop += scrollDelta;
+    codeWindow.dispatchEvent(new WheelEvent('wheel', { deltaY: scrollDelta, bubbles: true }));
+  }
 }
 
 // Terminal logger
@@ -772,9 +885,25 @@ function saveSettings() {
   closeSettingsModal();
 }
 
+// Mouse Movement Toggle
+function toggleMouseMovement() {
+  state.mouseMovementEnabled = !state.mouseMovementEnabled;
+  const mouseBtn = document.getElementById('btn-mouse');
+  if (state.mouseMovementEnabled) {
+    mouseBtn.innerHTML = `<span>🖱️</span> Mouse Move: ON`;
+    mouseBtn.className = 'btn btn-primary';
+    logTerminal('SYSTEM', 'Simulated Ghost Mouse cursor & DOM Pointer events ENABLED.');
+  } else {
+    mouseBtn.innerHTML = `<span>🚫</span> Mouse Move: OFF`;
+    mouseBtn.className = 'btn btn-secondary';
+    logTerminal('SYSTEM', 'Simulated Mouse movement disabled.');
+  }
+}
+
 // Initialize on DOM Ready
 document.addEventListener('DOMContentLoaded', () => {
   initWorker();
+  initGhostMouse();
 
   // Populate sidebar file list
   const fileListEl = document.getElementById('file-list');
@@ -803,6 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Event Listeners
   document.getElementById('btn-toggle').addEventListener('click', toggleRunning);
+  document.getElementById('btn-mouse').addEventListener('click', toggleMouseMovement);
   document.getElementById('btn-sound').addEventListener('click', toggleSound);
   document.getElementById('btn-clear').addEventListener('click', clearEditor);
   document.getElementById('btn-settings').addEventListener('click', openSettingsModal);
